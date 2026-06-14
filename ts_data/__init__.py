@@ -6,6 +6,7 @@ from .imputation import ImputationDataset
 from .generation import GenerationDataset
 from .classification import ClassificationDataset
 from .anomaly import AnomalyDataset
+from .conditional_generation import ConditionalGenerationDataset, PreSplitGenerationDataset
 from .datamodule import DataModule
 from .utils import (
     load_data,
@@ -17,7 +18,7 @@ from .utils import (
     DATASET_INFO,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "BaseTimeSeriesDataset",
@@ -26,6 +27,8 @@ __all__ = [
     "GenerationDataset",
     "ClassificationDataset",
     "AnomalyDataset",
+    "ConditionalGenerationDataset",
+    "PreSplitGenerationDataset",
     "DataModule",
     "load_data",
     "load_csv",

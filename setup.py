@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="ts_data",
-    version="0.1.0",
+    version="0.2.0",
     description="Time series data loading and processing library",
     packages=find_packages(),
     python_requires=">=3.8",

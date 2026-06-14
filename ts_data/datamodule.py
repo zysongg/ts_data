@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 from typing import Optional, Tuple, Union
+from pathlib import Path
 from sklearn.preprocessing import StandardScaler
 
 from .forecast import ForecastDataset
@@ -10,6 +11,7 @@ from .imputation import ImputationDataset
 from .generation import GenerationDataset
 from .classification import ClassificationDataset
 from .anomaly import AnomalyDataset
+from .conditional_generation import ConditionalGenerationDataset
 from .utils import load_data
 
 
@@ -24,6 +26,8 @@ class DataModule:
     Args:
         data: 原始数据 [T, F]，或文件路径字符串
         labels: 标签（用于分类/异常检测）
+        text_emb: 文本嵌入 [N, D] 或 [T, D]（用于条件生成）
+        attrs: 属性 [N, A] 或 [T, A]（用于条件生成）
         split_ratio: 分割比例 (train, val, test)
         split_mode: 分割模式 ("ratio" | "standard")
         dataset_name: 数据集名称（用于标准分割）
@@ -44,6 +48,8 @@ class DataModule:
         self,
         data: Union[np.ndarray, str],
         labels: Optional[np.ndarray] = None,
+        text_emb: Optional[np.ndarray] = None,
+        attrs: Optional[np.ndarray] = None,
         split_ratio: Tuple[float, float, float] = (0.6, 0.2, 0.2),
         split_mode: str = "ratio",
         dataset_name: Optional[str] = None,
@@ -63,6 +69,8 @@ class DataModule:
             self.dates = None
 
         self.labels = labels
+        self.text_emb = text_emb.astype(np.float32) if text_emb is not None else None
+        self.attrs = attrs
         self.split_ratio = split_ratio
         self.split_mode = split_mode
         self.dataset_name = dataset_name.lower() if dataset_name else None
@@ -115,7 +123,7 @@ class DataModule:
 
         Args:
             flag: "train" | "val" | "test"
-            task: "forecast" | "imputation" | "generation" | "classification" | "anomaly"
+            task: "forecast" | "imputation" | "generation" | "conditional_generation" | "classification" | "anomaly"
             **kwargs: 传递给 Dataset 的参数
 
         Returns:
@@ -138,6 +146,10 @@ class DataModule:
         x_mark = self.time_marks[start:end] if self.time_marks is not None else None
         y_mark = x_mark  # 预测任务中 y_mark 通常与 x_mark 相同
 
+        # 条件信息（用于条件生成任务）
+        text_emb = self.text_emb[start:end] if self.text_emb is not None else None
+        attrs = self.attrs[start:end] if self.attrs is not None else None
+
         # 通用参数
         common_kwargs = {
             "scale": False,  # 已经在 DataModule 中标准化
@@ -150,6 +162,15 @@ class DataModule:
         if "y_mark" not in kwargs and y_mark is not None and task == "forecast":
             common_kwargs["y_mark"] = y_mark
 
+        # 条件生成任务需要特殊处理
+        if task == "conditional_generation":
+            if "text_emb" not in kwargs and text_emb is not None:
+                common_kwargs["text_emb"] = text_emb
+            if "attrs" not in kwargs and attrs is not None:
+                common_kwargs["attrs"] = attrs
+            if "labels" not in kwargs and labels is not None:
+                common_kwargs["labels"] = labels
+
         common_kwargs.update(kwargs)
 
         if task == "forecast":
@@ -158,6 +179,8 @@ class DataModule:
             return ImputationDataset(data=data, **common_kwargs)
         elif task == "generation":
             return GenerationDataset(data=data, **common_kwargs)
+        elif task == "conditional_generation":
+            return ConditionalGenerationDataset(data=data, **common_kwargs)
         elif task == "classification":
             return ClassificationDataset(data=data, labels=labels, **common_kwargs)
         elif task == "anomaly":
@@ -169,6 +192,62 @@ class DataModule:
     def inverse_transform(self, data: np.ndarray) -> np.ndarray:
         """逆标准化"""
         return self.scaler.inverse_transform(data)
+
+    @staticmethod
+    def from_contsg_folder(
+        data_folder: Union[str, Path],
+        split: str = "train",
+        normalize: bool = True,
+    ):
+        """从 ConTSG-Bench 格式的文件夹加载数据
+
+        期望的文件结构：
+            data_folder/
+            ├── {split}_ts.npy          # (N, L, C)
+            ├── {split}_caps.npy        # (N,) 文本描述 [可选]
+            ├── {split}_cap_emb.npy     # (N, D) 文本嵌入 [可选]
+            ├── {split}_attrs_idx.npy   # (N, A) 属性 [可选]
+            └── {split}_labels.npy      # (N,) 标签 [可选]
+
+        Args:
+            data_folder: 数据文件夹路径
+            split: "train" | "valid" | "test"
+            normalize: 是否标准化
+
+        Returns:
+            PreSplitGenerationDataset 实例
+        """
+        from .conditional_generation import PreSplitGenerationDataset
+
+        data_folder = Path(data_folder)
+
+        # 加载时序数据
+        ts_path = data_folder / f"{split}_ts.npy"
+        if not ts_path.exists():
+            raise FileNotFoundError(f"Time series file not found: {ts_path}")
+        ts = np.load(ts_path)
+
+        # 加载可选的条件信息
+        caps_path = data_folder / f"{split}_caps.npy"
+        caps = np.load(caps_path, allow_pickle=True) if caps_path.exists() else None
+
+        cap_emb_path = data_folder / f"{split}_cap_emb.npy"
+        cap_emb = np.load(cap_emb_path) if cap_emb_path.exists() else None
+
+        attrs_path = data_folder / f"{split}_attrs_idx.npy"
+        attrs = np.load(attrs_path) if attrs_path.exists() else None
+
+        labels_path = data_folder / f"{split}_labels.npy"
+        labels = np.load(labels_path) if labels_path.exists() else None
+
+        return PreSplitGenerationDataset(
+            ts=ts,
+            text_emb=cap_emb,
+            attrs=attrs,
+            labels=labels,
+            caps=caps,
+            normalize=normalize,
+        )
 
 
 __all__ = ["DataModule"]

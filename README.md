@@ -11,8 +11,8 @@ pip install -e .
 
 ## 功能特性
 
-- 支持 5 种时序任务：预测、插补、生成、分类、异常检测
-- 支持多种数据格式：CSV、NPY
+- 支持 6 种时序任务：预测、插补、生成、条件生成、分类、异常检测
+- 支持多种数据格式：CSV、NPY、TSFLib 格式
 - 支持自动/手动时间戳推断
 - 支持自定义滑窗步长（stride）
 - 支持 train/val/test 分割
@@ -135,7 +135,65 @@ sample = ds[0]
 # }
 ```
 
-### 4. 分类任务 (Classification)
+### 4. 条件生成任务 (Conditional Generation)
+
+条件生成支持文本、属性、标签三种条件类型，适用于 ConTSG-Bench 等条件生成基准测试。
+
+```python
+# 准备条件信息
+text_emb = np.random.randn(10000, 1024)  # [T, D] 文本嵌入
+attrs = np.random.randint(0, 5, size=(10000, 3))  # [T, A] 属性
+labels = np.random.randint(0, 3, size=10000)  # [T] 标签
+
+# 创建 DataModule（传入条件信息）
+dm = DataModule(
+    data=data,
+    text_emb=text_emb,
+    attrs=attrs,
+    labels=labels,
+    split_ratio=(0.6, 0.2, 0.2),
+)
+
+ds = dm.create_dataset(
+    flag="train",
+    task="conditional_generation",
+    window_size=96,
+)
+
+sample = ds[0]
+# sample = {
+#     "x": Tensor [F, 96],         # 时序数据
+#     "x_mark": Tensor [96, 4],    # 时间特征
+#     "text_emb": Tensor [1024],   # 文本嵌入
+#     "attrs": Tensor [3],         # 属性
+#     "label": int,                # 标签
+#     "idx": int,                  # 窗口起始位置
+# }
+```
+
+#### 加载 ConTSG-Bench 格式数据
+
+```python
+from ts_data import DataModule
+
+# 从 ConTSG-Bench 格式的文件夹加载
+train_ds = DataModule.from_contsg_folder("./datasets/ettm1", split="train")
+val_ds = DataModule.from_contsg_folder("./datasets/ettm1", split="valid")
+test_ds = DataModule.from_contsg_folder("./datasets/ettm1", split="test")
+
+sample = train_ds[0]
+# sample = {
+#     "x": Tensor [F, L],          # 时序数据 [F, L]
+#     "tp": Tensor [L],            # 时间位置 [0, 1, ..., L-1]
+#     "text_emb": Tensor [D],      # 文本嵌入
+#     "attrs": Tensor [A],         # 属性
+#     "label": int,                # 标签
+#     "cap": str,                  # 原始文本描述
+#     "idx": int,                  # 样本索引
+# }
+```
+
+### 5. 分类任务 (Classification)
 
 ```python
 # 需要传入标签
@@ -161,7 +219,7 @@ sample = ds[0]
 # }
 ```
 
-### 5. 异常检测任务 (Anomaly Detection)
+### 6. 异常检测任务 (Anomaly Detection)
 
 ```python
 # 需要传入异常标签
