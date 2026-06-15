@@ -104,7 +104,7 @@ def load_csv(
 
     if date_col is not None and date_col in df.columns:
         # 从 CSV 中读取日期
-        dates = pd.to_datetime(df[date_col])
+        dates = pd.DatetimeIndex(pd.to_datetime(df[date_col]))
         time_marks = _time_features(dates, freq=freq)
         df = df.drop(columns=[date_col])
     elif infer_time or start_date is not None:

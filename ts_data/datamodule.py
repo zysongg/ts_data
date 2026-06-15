@@ -43,6 +43,12 @@ class DataModule:
         "ettm1": (12 * 30 * 24 * 4, 12 * 30 * 24 * 4 + 4 * 30 * 24 * 4, 12 * 30 * 24 * 4 + 8 * 30 * 24 * 4),
         "ettm2": (12 * 30 * 24 * 4, 12 * 30 * 24 * 4 + 4 * 30 * 24 * 4, 12 * 30 * 24 * 4 + 8 * 30 * 24 * 4),
     }
+    
+    # ETT 数据集名称集合（用于自动识别）
+    ETT_DATASETS = {"etth1", "etth2", "ettm1", "ettm2"}
+    
+    # 默认分割比例
+    DEFAULT_SPLIT_RATIO = (0.7, 0.1, 0.2)
 
     def __init__(
         self,
@@ -50,8 +56,8 @@ class DataModule:
         labels: Optional[np.ndarray] = None,
         text_emb: Optional[np.ndarray] = None,
         attrs: Optional[np.ndarray] = None,
-        split_ratio: Tuple[float, float, float] = (0.6, 0.2, 0.2),
-        split_mode: str = "ratio",
+        split_ratio: Optional[Tuple[float, float, float]] = None,
+        split_mode: Optional[str] = None,
         dataset_name: Optional[str] = None,
         scale: bool = True,
         file_format: Optional[str] = None,
@@ -71,10 +77,21 @@ class DataModule:
         self.labels = labels
         self.text_emb = text_emb.astype(np.float32) if text_emb is not None else None
         self.attrs = attrs
-        self.split_ratio = split_ratio
-        self.split_mode = split_mode
         self.dataset_name = dataset_name.lower() if dataset_name else None
         self.scale = scale
+
+        # 自动推断分割模式
+        if split_mode is None:
+            if self.dataset_name in self.ETT_DATASETS:
+                split_mode = "standard"
+            else:
+                split_mode = "ratio"
+        self.split_mode = split_mode
+
+        # 设置分割比例
+        if split_ratio is None:
+            split_ratio = self.DEFAULT_SPLIT_RATIO
+        self.split_ratio = split_ratio
 
         # 计算分割点
         self._compute_splits()
