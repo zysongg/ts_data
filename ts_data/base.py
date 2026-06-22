@@ -27,7 +27,9 @@ class BaseTimeSeriesDataset(Dataset):
     ):
         self.data = data.astype(np.float32)
         self.window_size = window_size
-        self.stride = stride
+        if stride == 0:
+            raise ValueError("stride must be non-zero")
+        self.stride = abs(stride)
         self.scale = scale
         self.offset = offset
 

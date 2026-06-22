@@ -243,6 +243,42 @@ class TestDataModule:
         assert first_val_idx > last_train_idx
         assert first_test_idx > last_val_idx
 
+    def test_positive_stride_only_affects_test_split(self, sample_data):
+        dm = DataModule(
+            data=sample_data,
+            split_ratio=(0.6, 0.2, 0.2),
+            scale=False,
+        )
+
+        train_ds = dm.create_dataset("train", "forecast", input_len=24, pred_len=12, stride=4)
+        val_ds = dm.create_dataset("val", "forecast", input_len=24, pred_len=12, stride=4)
+        test_ds = dm.create_dataset("test", "forecast", input_len=24, pred_len=12, stride=4)
+
+        assert train_ds.stride == 1
+        assert val_ds.stride == 1
+        assert test_ds.stride == 4
+        assert train_ds[1]["idx"] - train_ds[0]["idx"] == 1
+        assert val_ds[1]["idx"] - val_ds[0]["idx"] == 1
+        assert test_ds[1]["idx"] - test_ds[0]["idx"] == 4
+
+    def test_negative_stride_affects_all_splits(self, sample_data):
+        dm = DataModule(
+            data=sample_data,
+            split_ratio=(0.6, 0.2, 0.2),
+            scale=False,
+        )
+
+        train_ds = dm.create_dataset("train", "forecast", input_len=24, pred_len=12, stride=-4)
+        val_ds = dm.create_dataset("val", "forecast", input_len=24, pred_len=12, stride=-4)
+        test_ds = dm.create_dataset("test", "forecast", input_len=24, pred_len=12, stride=-4)
+
+        assert train_ds.stride == 4
+        assert val_ds.stride == 4
+        assert test_ds.stride == 4
+        assert train_ds[1]["idx"] - train_ds[0]["idx"] == 4
+        assert val_ds[1]["idx"] - val_ds[0]["idx"] == 4
+        assert test_ds[1]["idx"] - test_ds[0]["idx"] == 4
+
     def test_etth_split(self, sample_data):
         # ETT 标准分割需要足够长的数据
         long_data = np.random.randn(20000, 5).astype(np.float32)

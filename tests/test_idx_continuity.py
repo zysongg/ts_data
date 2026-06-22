@@ -15,7 +15,7 @@ def test_idx_continuity_across_splits():
     np.random.seed(42)
     data = np.random.randn(1000, 5).astype(np.float32)
 
-    for stride in [1, 2, 3, 5, 10]:
+    for stride in [-1, -2, -3, -5, -10]:
         dm = DataModule(
             data=data,
             split_ratio=(0.6, 0.2, 0.2),
@@ -60,7 +60,7 @@ def test_idx_within_split():
     np.random.seed(42)
     data = np.random.randn(1000, 5).astype(np.float32)
 
-    for stride in [1, 2, 3, 5, 10]:
+    for stride in [-1, -2, -3, -5, -10]:
         dm = DataModule(
             data=data,
             split_ratio=(0.6, 0.2, 0.2),
@@ -74,7 +74,8 @@ def test_idx_within_split():
             for i in range(min(10, len(ds) - 1)):
                 idx_i = ds[i]["idx"]
                 idx_next = ds[i + 1]["idx"]
-                assert idx_next - idx_i == stride, \
+                expected_stride = abs(stride)
+                assert idx_next - idx_i == expected_stride, \
                     f"stride={stride}, {flag}: idx[{i}]={idx_i}, idx[{i+1}]={idx_next}, diff={idx_next - idx_i}"
 
             print(f"stride={stride}, {flag}: ✓ 内部 idx 连续性验证通过")
@@ -85,7 +86,7 @@ def test_idx_matches_original_sequence():
     np.random.seed(42)
     data = np.random.randn(100, 3).astype(np.float32)
 
-    stride = 5
+    stride = -5
     dm = DataModule(
         data=data,
         split_ratio=(0.6, 0.2, 0.2),
@@ -98,7 +99,7 @@ def test_idx_matches_original_sequence():
     for i in range(min(5, len(train_ds))):
         sample = train_ds[i]
         idx = sample["idx"]
-        expected_idx = i * stride
+        expected_idx = i * abs(stride)
         assert idx == expected_idx, f"sample[{i}]: idx should be {expected_idx}, got {idx}"
 
     print("✓ idx 与原始序列位置匹配验证通过")
@@ -112,7 +113,7 @@ def test_all_tasks_idx():
     anomaly_labels = np.zeros(1000)
     anomaly_labels[100:200] = 1
 
-    stride = 3
+    stride = -3
 
     # 预测任务
     dm = DataModule(data=data, split_ratio=(0.6, 0.2, 0.2), scale=False)

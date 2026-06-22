@@ -189,6 +189,9 @@ class DataModule:
                 common_kwargs["labels"] = labels
 
         common_kwargs.update(kwargs)
+        common_kwargs["stride"] = self._resolve_split_stride(
+            flag, int(common_kwargs.get("stride", 1))
+        )
 
         if task == "forecast":
             return ForecastDataset(data=data, **common_kwargs)
@@ -205,6 +208,19 @@ class DataModule:
             return AnomalyDataset(data=data, labels=labels, mode=mode, **common_kwargs)
         else:
             raise ValueError(f"Unknown task: {task}")
+
+    @staticmethod
+    def _resolve_split_stride(flag: str, stride: int) -> int:
+        """Map signed stride semantics to the positive Dataset stride.
+
+        Positive stride subsamples only the test split. Negative stride applies
+        ``abs(stride)`` to train, val, and test.
+        """
+        if stride == 0:
+            raise ValueError("stride must be non-zero")
+        if stride < 0:
+            return abs(stride)
+        return stride if flag == "test" else 1
 
     def inverse_transform(self, data: np.ndarray) -> np.ndarray:
         """逆标准化"""
